@@ -8,6 +8,16 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+// 根目录测试，方便你浏览器直接打开检查
+app.get('/', (req, res) => {
+  res.send('✅ AI 后端正在运行中，请通过前端发送请求！');
+});
+
+// 自检接口
+app.get('/test', (req, res) => {
+  res.json({ status: "ok", message: "后端已连接" });
+});
+
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
@@ -15,19 +25,21 @@ const replicate = new Replicate({
 app.post('/generate', async (req, res) => {
   try {
     const { prompt, faceUrl } = req.body;
-    console.log("收到请求:", prompt);
+    console.log("收到生图请求:", prompt);
 
-    // ✅ 使用 InstantX 官方最新的 InstantID 模型 ID
+    if (!process.env.REPLICATE_API_TOKEN) {
+      throw new Error("服务器缺少 API Token，请在 Render 环境变量中配置");
+    }
+
     const output = await replicate.run(
       "instantx/instantid:429738450396071279166723223075276326757122177309903932759600028c",
       {
         input: {
           image: faceUrl,
-          // 提示词稍微增强一点细节，确保生成成功
-          prompt: `a photo of a person, ${prompt}, realistic, 8k, detailed, high quality, film grain`,
-          negative_prompt: "photorealistic, ugly, broken, distorted, low quality, bad anatomy, blur, pixelated",
-          style: "Film", // 风格选 Film 比较真实
-          identitynet_strength_ratio: 0.8, 
+          prompt: `a realistic photo of a woman, ${prompt}, realistic lighting, high quality, 8k`,
+          negative_prompt: "cartoon, anime, photorealistic, ugly, broken, distorted, low quality, bad anatomy",
+          style: "(No style)", 
+          identitynet_strength_ratio: 0.8,
           adapter_strength_ratio: 0.8,
           num_inference_steps: 30,
           guidance_scale: 5
@@ -35,18 +47,16 @@ app.post('/generate', async (req, res) => {
       }
     );
     
-    console.log("生成结果:", output);
-    
-    // InstantID 有时候返回的是 url 字符串，有时是数组，这里做个兼容
+    console.log("AI 生成成功:", output);
     const imageUrl = Array.isArray(output) ? output[0] : output;
     res.json({ url: imageUrl });
     
   } catch (error) {
-    console.error("生成失败详细报错:", error);
+    console.error("生成报错:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+  console.log(`Server is running on port ${port}`);
 });
