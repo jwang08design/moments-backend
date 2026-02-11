@@ -5,11 +5,9 @@ const Replicate = require('replicate');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// 允许跨域和大数据包
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// 初始化 Replicate，自动读取环境变量
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
@@ -19,27 +17,32 @@ app.post('/generate', async (req, res) => {
     const { prompt, faceUrl } = req.body;
     console.log("收到请求:", prompt);
 
-    // 调用 InstantID 模型
+    // ✅ 使用 InstantX 官方最新的 InstantID 模型 ID
     const output = await replicate.run(
-      "wangqixun/instant-id:c13d78908727457002029707297f620f323d4747792271c77f0a76a8779603a7",
+      "instantx/instantid:429738450396071279166723223075276326757122177309903932759600028c",
       {
         input: {
           image: faceUrl,
-          // 强制加上贴纸风格的提示词
-          prompt: `sticker style, die-cut, white background, cute 3d vector art. ${prompt}`,
-          negative_prompt: "photorealistic, ugly, broken, distorted, low quality, bad anatomy",
-          style: "Neon", 
-          identitynet_strength_ratio: 0.8, // 锁脸强度
+          // 提示词稍微增强一点细节，确保生成成功
+          prompt: `a photo of a person, ${prompt}, realistic, 8k, detailed, high quality, film grain`,
+          negative_prompt: "photorealistic, ugly, broken, distorted, low quality, bad anatomy, blur, pixelated",
+          style: "Film", // 风格选 Film 比较真实
+          identitynet_strength_ratio: 0.8, 
           adapter_strength_ratio: 0.8,
+          num_inference_steps: 30,
+          guidance_scale: 5
         }
       }
     );
     
-    // InstantID 返回的是一个数组，第一张图是我们要的
-    res.json({ url: output[0] });
+    console.log("生成结果:", output);
+    
+    // InstantID 有时候返回的是 url 字符串，有时是数组，这里做个兼容
+    const imageUrl = Array.isArray(output) ? output[0] : output;
+    res.json({ url: imageUrl });
     
   } catch (error) {
-    console.error("后端生成失败:", error);
+    console.error("生成失败详细报错:", error);
     res.status(500).json({ error: error.message });
   }
 });
